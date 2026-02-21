@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Berlin Building Dashboard</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <!-- Leaflet Heat plugin -->
+    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
+            display: flex;
+            height: 100vh;
+        }
+        #map {
+            flex: 1;
+        }
+        #sidebar {
+            width: 360px;
+            padding: 20px;
+            background: #f4f4f4;
+            overflow-y: auto;
+            border-left: 1px solid #ccc;
+        }
+        h2, h3 {
+            margin-top: 0;
+        }
+        .form-group {
+            margin-bottom: 10px;
+        }
+        input, select, button {
+            width: 100%;
+            padding: 6px;
+            margin-top: 2px;
+        }
+        button {
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="sidebar">
+    <h2>Filter Buildings</h2>
+    <form id="filterForm">
+        <div class="form-group">
+            <label>District</label>
+            <input type="text" id="district" placeholder="Mitte">
+        </div>
+        <div class="form-group">
+            <label>Postal Code</label>
+            <input type="text" id="postal_code" placeholder="10115">
+        </div>
+        <div class="form-group">
+            <label>Construction Year</label>
+            <input type="number" id="construction_year">
+        </div>
+        <div class="form-group">
+            <label>Number of Units</label>
+            <input type="number" id="num_units">
+        </div>
+        <div class="form-group">
+            <label>Total Area (m²)</label>
+            <input type="number" id="total_area_m2">
+        </div>
+        <div class="form-group">
+            <label>Number of Floors</label>
+            <input type="number" id="num_floors">
+        </div>
+        <div class="form-group">
+            <label>Last Renovation Year</label>
+            <input type="number" id="last_renovation_year">
+        </div>
+        <div class="form-group">
+            <label>Heating System</label>
+            <select id="heating_system">
+                <option value="">Any</option>
+                <option value="Gas boiler">Gas boiler</option>
+                <option value="Oil boiler">Oil boiler</option>
+                <option value="Electric">Electric</option>
+                <option value="District heating">District heating</option>
+                <option value="Heat pump">Heat pump</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Heatmap Attribute</label>
+            <select id="attribute">
+                <option value="num_floors">Number of Floors</option>
+                <option value="total_area_m2">Total Area</option>
+                <option value="last_renovation_year">Last Renovation Year</option>
+                <option value="num_units">Total Units</option>
+                <option value="construction_year">Construction Year</option>
+            </select>
+        </div>
+        <button type="submit">Update Heatmap</button>
+    </form>
+</div>
+
+<script>
+    // Initialize map
+    var map = L.map('map').setView([52.52, 13.405], 11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    var heatLayer = L.heatLayer([], {radius: 25, blur: 15, maxZoom: 17}).addTo(map);
+    var markerLayer = L.layerGroup().addTo(map);
+
+    // Fetch building data with all filters including heating
+    document.getElementById('filterForm').addEventListener('submit', function(e){
+        e.preventDefault();
+
+        const params = new URLSearchParams({
+            district: document.getElementById('district').value,
+            postal_code: document.getElementById('postal_code').value,
+            construction_year: document.getElementById('construction_year').value,
+            num_units: document.getElementById('num_units').value,
+            total_area_m2: document.getElementById('total_area_m2').value,
+            num_floors: document.getElementById('num_floors').value,
+            last_renovation_year: document.getElementById('last_renovation_year').value,
+            heating_system: document.getElementById('heating_system').value // Include heating filter
+        });
+
+        fetch(`/api/heatmap_data/?${params.toString()}`)
+            .then(res => res.json())
+            .then(data => {
+                heatLayer.setLatLngs([]);
+                markerLayer.clearLayers();
+
+                const attribute = document.getElementById('attribute').value;
+
+                data.forEach(b => {
+                    const heatValue = parseFloat(b[attribute]) || 0;
+                    heatLayer.addLatLng([b.latitude, b.longitude, heatValue]);
+
+                    const marker = L.circleMarker([b.latitude, b.longitude], {
+                        radius: 6,
+                        color: 'blue',
+                        fillColor: 'cyan',
+                        fillOpacity: 0.7
+                    }).bindPopup(
+                        `<b>${b.address}</b><br>` +
+                        `Energy: ${b.energy_consumption_kwh_m2} kWh/m²<br>` +
+                        `Floors: ${b.num_floors}<br>` +
+                        `Units: ${b.num_units}<br>` +
+                        `Total Area: ${b.total_area_m2} m²<br>` +
+                        `Heating: ${b.heating_system}<br>` +
+                        `Construction Year: ${b.construction_year}<br>` +
+                        `Last Renovation: ${b.last_renovation_year}<br>` +
+                        `CO₂ Reduction: ${b.co2_reduction_kg_m2} kg/m²<br>` +
+                        `Estimated Cost: €${b.estimated_cost_eur}<br>` +
+                        `Eligible Subsidies: ${b.eligible_subsidies}`
+                    );
+                    markerLayer.addLayer(marker);
+                });
+            });
+    });
+
+    // Trigger initial load
+    document.getElementById('filterForm').dispatchEvent(new Event('submit'));
+</script>
+
+</body>
+</html>

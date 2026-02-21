@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Property Search</title>
+</head>
+<body>
+    <h2>Search Similar Properties</h2>
+    <form method="get">
+        {{ form.as_p }}
+        <button type="submit">Search</button>
+    </form>
+
+    <h3>Results:</h3>
+    <ul>
+    {% for building in results %}
+        <li>
+            {{ building.address }} | {{ building.district }} | {{ building.energy_consumption_kwh_m2 }} kWh/m²
+        </li>
+    {% empty %}
+        <li>No matching properties found.</li>
+    {% endfor %}
+    </ul>
+</body>
+</html>
